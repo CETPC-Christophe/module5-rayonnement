@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TOPOGRAPHIE - MODULE 5</title>
+<style>
+:root { --orange:#ff6600; --noir:#222; --gris:#f3f3f3; }
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--gris); color: var(--noir); margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:16px; }
+.banner { background:var(--noir); color:#fff; padding:10px; border-radius:10px; text-align:center; font-weight:700; width:100%; max-width:820px; margin-bottom:15px; }
+h1 { color:var(--orange); text-align:center; margin:8px 0; }
+.subtitle { color:#555; text-align:center; margin-bottom:18px; }
+.question { background:#fff; padding:20px; margin:10px auto; border-left:8px solid var(--orange); border-radius:10px; box-shadow:0 3px 6px rgba(0,0,0,0.08); width:100%; max-width:820px; text-align:center; }
+.question p { font-weight:600; }
+.answers input[type="number"] { width:90%; max-width:420px; padding:10px; font-size:1.1rem; border-radius:6px; border:1px solid #ccc; margin-top:10px; }
+button { background:var(--orange); color:#fff; border:none; padding:10px 18px; border-radius:8px; font-size:1rem; cursor:pointer; margin-top:15px; }
+button[disabled] { opacity:0.5; cursor:not-allowed; }
+button:hover:not([disabled]) { background:#e65c00; }
+table { width:100%; border-collapse:collapse; margin-top:15px; }
+th, td { border:1px solid #ccc; padding:6px; text-align:center; }
+thead { background:#f0f0f0; }
+@media (max-width:600px){ .answers input{ width:100%; } }
+</style>
+</head>
+<body>
+
+<div class="banner">📚 TOPOGRAPHIE - MODULE 5 📚</div>
+<h1 id="pageTitle">Le nivellement par rayonnement</h1>
+<p class="subtitle" id="quizSubtitle"></p>
+
+<div id="intro" class="intro">
+  <div id="testTypeSelection" class="question">
+    <p style="font-weight:600; font-size:1.1rem;">Sélectionnez le type de test</p>
+    <div style="margin-top:20px;">
+      <button id="exercice1Btn" style="background:#4CAF50; margin:10px; padding:15px 25px; font-size:1.05rem; width:200px;">📘 Exercice 1<br><span style="font-size:0.85rem;">(10 questions)</span></button>
+      <button id="exercice2Btn" style="background:#2196F3; margin:10px; padding:15px 25px; font-size:1.05rem; width:200px;">📗 Exercice 2<br><span style="font-size:0.85rem;">(10 questions)</span></button>
+      <button id="evaluationBtn" style="background:#ff6600; margin:10px; padding:15px 25px; font-size:1.05rem; width:200px;">🎯 Évaluation<br><span style="font-size:0.85rem;">(20 questions)</span></button>
+    </div>
+  </div>
+  
+  <div id="nameSelection" class="question" style="display:none;">
+    <p id="welcomeTitle"></p>
+    <p id="welcomeText"></p>
+    <input id="candidateName" type="text" placeholder="Nom de l'élève">
+    <div style="margin-top:12px;">
+      <button id="startBtn" disabled>➡️ Suivant</button>
+    </div>
+  </div>
+</div>
+
+<div id="quiz" style="display:none; width:100%; max-width:820px;"></div>
+<div class="control-container" style="text-align:center;">
+  <button id="restartBtn" style="display:none;">🔄 Nouvelle évaluation</button>
+</div>
+
+<script>
+const i18n = {
+  welcome: "Bienvenue",
+  enterName: "Merci d'indiquer votre nom avant de commencer :",
+  nextBtn: "➡️ Suivant",
+  finishBtn: "🏁 Terminer",
+  questions: "Répondez à {count} questions",
+  candidate: "Candidat : ",
+  date: "Date : ",
+  result: "Résultat : ",
+  question: "⚙️ Question {num} / {total} : {text}"
+};
+
+const AUTHORIZED_CANDIDATES = {
+  "Professeur": ["MARINO","CHARDON","CHIOTTI","MATHIEU","MAUSSION"],
+  "1 cetpc": ["BONTEMPS","BRIATORE","BUCCIO","DIONISI","ERETEO","GARNERO","GRISONI","GUENEAU","HADANGUE","LACROIX","LEJEUNE","MAAZAOUI","MARTINEAU","MONELLO","PI-BUTHION","QUILICO","REMY","SANTIAGO","SCIARAFFA","THEVENET","TRUFFE","VILLEROY"],
+  "2 cetpc": ["ALBERT","AUDISIO","BABA","BERTOLOTTO","BOUCHEE","BOUFFART","BOURGUIGNON","BOUSQUET","CAPPADORO","COLPAERT","CULMINE","DOYEN","GAALOUL","GEORGE","GUEURUNURIAN","MONTEIRO","PAGE","PALAGONIA","PELLET","PONZO","PRUVOST","RICHARD","TETI"]
+};
+
+const allThemes = [
+  { name:"Calculer l'altitude des points 1 et 2", count:1, questions:Array(20).fill({ text:"Calculez l'altitude des points 1 et 2." }) },
+  { name:"Calculer l'atltitude des points 1 - 2 - 3", count:1, questions:Array(20).fill({ text:"Calculez l'altitude des points 1 - 2 - 3." }) }
+];
+
+let selectedQuestions = [];
+let currentIndex = 0;
+let userAnswers = [];
+let candidateName = "";
+let score = 0;
+let quizName = "MODULE 5";
+let testType = "";
+let questionCount = 10;
+let themeFilter = null;
+const DOM = {
+  intro: document.getElementById("intro"),
+  quiz: document.getElementById("quiz"),
+  startBtn: document.getElementById("startBtn"),
+  restartBtn: document.getElementById("restartBtn"),
+  candidateName: document.getElementById("candidateName"),
+  quizSubtitle: document.getElementById("quizSubtitle"),
+  pageTitle: document.getElementById("pageTitle"),
+  testTypeSelection: document.getElementById("testTypeSelection"),
+  nameSelection: document.getElementById("nameSelection"),
+  exercice1Btn: document.getElementById("exercice1Btn"),
+  exercice2Btn: document.getElementById("exercice2Btn"),
+  evaluationBtn: document.getElementById("evaluationBtn")
+};
+
+function shuffle(arr){ return arr.sort(()=>Math.random()-0.5); }
+
+function getRandomQuestionsIntercalated(filterTheme = null) {
+  const themesToUse = filterTheme ? allThemes.filter(t => t.name === filterTheme) : allThemes;
+  const questionsPerTheme = questionCount / themesToUse.length;
+  const themeQuestions = themesToUse.map(theme => {
+    const shuffled = shuffle([...theme.questions]);
+    return shuffled.slice(0, questionsPerTheme).map(q => ({ ...q, theme: theme.name }));
+  });
+
+  const finalList = [];
+  let remaining = true;
+  let index = 0;
+
+  while (remaining) {
+    remaining = false;
+    for (const questions of themeQuestions) {
+      if (index < questions.length) {
+        finalList.push(questions[index]);
+        remaining = true;
+      }
+    }
+    index++;
+  }
+  return finalList;
+}
+
+function renderQuestion(){
+  const q = selectedQuestions[currentIndex];
+  let lecture1, lecture2, alt1;
+  let photoHTML = '';
+
+  if(q.theme === "Calculer l'altitude des points 1 et 2"){
+    const lectureRef = Math.floor(Math.random()*(4000-100+1))+100;
+    let lecturePt1; do { lecturePt1=Math.floor(Math.random()*(4000-100+1))+100; } while(lecturePt1===lectureRef);
+    let lecturePt2; do { lecturePt2=Math.floor(Math.random()*(4000-100+1))+100; } while(lecturePt2===lectureRef || lecturePt2===lecturePt1);
+    const altRef = Math.floor(Math.random()*(1000-100+1))+100;
+    lecture1=lectureRef; lecture2=lecturePt1; alt1=altRef;
+    q.lecture3 = lecturePt2;
+    const photoUrls = [
+      "https://raw.githubusercontent.com/CETPC-Christophe/module5-rayonnement/refs/heads/main/image2altiv1.png",
+      "https://raw.githubusercontent.com/CETPC-Christophe/module5-rayonnement/refs/heads/main/image2altiv2.png",
+      "https://raw.githubusercontent.com/CETPC-Christophe/module5-rayonnement/refs/heads/main/image2altiv3.png"
+    ];
+    const randomPhoto = photoUrls[Math.floor(Math.random()*photoUrls.length)];
+    photoHTML=`<img src="${randomPhoto}" alt="Illustration" style="max-width:60%; margin-bottom:15px; border-radius:6px;">`;
+  
+
+  } else if(q.theme === "Calculer l'atltitude des points 1 - 2 - 3"){
+    const lectureRef = Math.floor(Math.random()*(4000-100+1))+100;
+    let lecturePt1; do { lecturePt1=Math.floor(Math.random()*(4000-100+1))+100; } while(lecturePt1===lectureRef);
+    let lecturePt2; do { lecturePt2=Math.floor(Math.random()*(4000-100+1))+100; } while(lecturePt2===lectureRef || lecturePt2===lecturePt1);
+    let lecturePt3; do { lecturePt3=Math.floor(Math.random()*(4000-100+1))+100; } while(lecturePt3===lectureRef || lecturePt3===lecturePt1 || lecturePt3===lecturePt2);
+    const altRef = Math.floor(Math.random()*(1000-100+1))+100;
+    lecture1=lectureRef; lecture2=lecturePt1; alt1=altRef;
+    q.lecture3 = lecturePt2;
+    q.lecture4 = lecturePt3;
+    const photoUrls = [
+      "https://raw.githubusercontent.com/CETPC-Christophe/module5-rayonnement/refs/heads/main/image3altiv1.png",
+      "https://raw.githubusercontent.com/CETPC-Christophe/module5-rayonnement/refs/heads/main/image3altiv2.png",
+      "https://raw.githubusercontent.com/CETPC-Christophe/module5-rayonnement/refs/heads/main/image3altiv3.png",
+      "https://raw.githubusercontent.com/CETPC-Christophe/module5-rayonnement/refs/heads/main/image3altiv4.png"
+    ];
+    const randomPhoto = photoUrls[Math.floor(Math.random()*photoUrls.length)];
+    photoHTML=`<img src="${randomPhoto}" alt="Illustration" style="max-width:60%; margin-bottom:15px; border-radius:6px;">`;
+  }
+
+  q.lecture1 = lecture1; q.lecture2 = lecture2; q.alt1 = alt1;
+
+  DOM.quiz.innerHTML = `
+    <div class="question">
+      <p>${i18n.question.replace("{num}",currentIndex+1).replace("{total}",selectedQuestions.length).replace("{text}",q.text)}</p>
+      ${photoHTML}
+      <div class="answers">
+        ${q.theme==="Calculer l'altitude des points 1 et 2"?`
+          <p>Lecture point de référence : <strong>${lecture1} mm</strong></p>
+          <p>Lecture point 1 : <strong>${lecture2} mm</strong></p>
+          <p>Lecture du point 2 : <strong>${q.lecture3} mm</strong></p>
+          <p>Altitude du point de référence : <strong>${alt1} m</strong></p>
+        `:`
+          <p>Lecture point de référence : <strong>${lecture1} mm</strong></p>
+          <p>Lecture point 1 : <strong>${lecture2} mm</strong></p>
+          <p>Lecture du point 2 : <strong>${q.lecture3} mm</strong></p>
+          <p>Lecture du point 3 : <strong>${q.lecture4} mm</strong></p>
+          <p>Altitude du point de référence : <strong>${alt1} m</strong></p>
+        `}
+        ${q.theme==="Calculer l'altitude des points 1 et 2"?`
+          <p style="margin-top:15px; font-weight:600;">Altitude du point 1</p>
+          <input type="number" step="0.001" id="answerField1" placeholder="Altitude du point 1 (m)">
+          <p style="margin-top:15px; font-weight:600;">Altitude du point 2</p>
+          <input type="number" step="0.001" id="answerField2" placeholder="Altitude du point 2 (m)">
+        `:`
+          <p style="margin-top:15px; font-weight:600;">Altitude du point 1</p>
+          <input type="number" step="0.001" id="answerField1" placeholder="Altitude du point 1 (m)">
+          <p style="margin-top:15px; font-weight:600;">Altitude du point 2</p>
+          <input type="number" step="0.001" id="answerField2" placeholder="Altitude du point 2 (m)">
+          <p style="margin-top:15px; font-weight:600;">Altitude du point 3</p>
+          <input type="number" step="0.001" id="answerField3" placeholder="Altitude du point 3 (m)">
+        `}
+      </div>
+      <button id="nextBtn" disabled>${currentIndex===selectedQuestions.length-1 ? i18n.finishBtn : i18n.nextBtn}</button>
+    </div>
+  `;
+
+  const nextBtn=document.getElementById("nextBtn");
+  
+  if(q.theme==="Calculer l'altitude des points 1 et 2"){
+    const answerField1=document.getElementById("answerField1");
+    const answerField2=document.getElementById("answerField2");
+    
+    const updateButtonState=()=>{
+      nextBtn.disabled=answerField1.value.trim()==="" || answerField2.value.trim()==="";
+    };
+    
+    answerField1.addEventListener("input", updateButtonState);
+    answerField2.addEventListener("input", updateButtonState);
+    
+    nextBtn.onclick=()=>{
+      const userVal1=Number(answerField1.value.trim());
+      const userVal2=Number(answerField2.value.trim());
+      const correctVal1=Number((alt1 + (lecture1-lecture2)/1000).toFixed(3));
+      const correctVal2=Number((alt1 + (lecture1-q.lecture3)/1000).toFixed(3));
+      q.correct1=correctVal1;
+      q.correct2=correctVal2;
+      userAnswers[currentIndex]={val1:userVal1, val2:userVal2};
+      currentIndex++;
+      if(currentIndex<selectedQuestions.length) renderQuestion();
+      else showResults();
+    };
+  } else if(q.theme==="Calculer l'atltitude des points 1 - 2 - 3"){
+    const answerField1=document.getElementById("answerField1");
+    const answerField2=document.getElementById("answerField2");
+    const answerField3=document.getElementById("answerField3");
+    
+    const updateButtonState=()=>{
+      nextBtn.disabled=answerField1.value.trim()==="" || answerField2.value.trim()==="" || answerField3.value.trim()==="";
+    };
+    
+    answerField1.addEventListener("input", updateButtonState);
+    answerField2.addEventListener("input", updateButtonState);
+    answerField3.addEventListener("input", updateButtonState);
+    
+    nextBtn.onclick=()=>{
+      const userVal1=Number(answerField1.value.trim());
+      const userVal2=Number(answerField2.value.trim());
+      const userVal3=Number(answerField3.value.trim());
+      const correctVal1=Number((alt1 + (lecture1-lecture2)/1000).toFixed(3));
+      const correctVal2=Number((alt1 + (lecture1-q.lecture3)/1000).toFixed(3));
+      const correctVal3=Number((alt1 + (lecture1-q.lecture4)/1000).toFixed(3));
+      q.correct1=correctVal1;
+      q.correct2=correctVal2;
+      q.correct3=correctVal3;
+      userAnswers[currentIndex]={val1:userVal1, val2:userVal2, val3:userVal3};
+      currentIndex++;
+      if(currentIndex<selectedQuestions.length) renderQuestion();
+      else showResults();
+    };
+  } else {
+    const answerField=document.getElementById("answerField");
+    answerField.addEventListener("input",()=>{ nextBtn.disabled=answerField.value.trim()===""; });
+
+    nextBtn.onclick=()=>{
+      const userVal=Number(answerField.value.trim());
+      const correctVal=Number((alt1 + (lecture1-lecture2)/1000).toFixed(3));
+      q.correct=correctVal;
+      userAnswers[currentIndex]=userVal;
+      currentIndex++;
+      if(currentIndex<selectedQuestions.length) renderQuestion();
+      else showResults();
+    };
+  }
+}
+
+function downloadCSV() {
+  let totalPoints=0;
+  selectedQuestions.forEach((q,i)=>{
+    if(q.theme==="Calculer l'altitude des points 1 et 2"){
+      totalPoints+=2;
+    } else if(q.theme==="Calculer l'atltitude des points 1 - 2 - 3"){
+      totalPoints+=3;
+    } else {
+      totalPoints+=1;
+    }
+  });
+  
+  let csv="Question;Lecture1 (mm);Lecture2 (mm);Lecture3 (mm);Lecture4 (mm);Altitude1 (m);Réponse élève;Réponse correcte;Points max\n";
+  selectedQuestions.forEach((q,i)=>{
+    if(q.theme==="Calculer l'altitude des points 1 et 2"){
+      csv+=`${i+1}-Pt1;${q.lecture1};${q.lecture2};${q.lecture3};;${q.alt1};${userAnswers[i].val1.toFixed(3)};${q.correct1.toFixed(3)};1\n`;
+      csv+=`${i+1}-Pt2;${q.lecture1};${q.lecture2};${q.lecture3};;${q.alt1};${userAnswers[i].val2.toFixed(3)};${q.correct2.toFixed(3)};1\n`;
+    } else if(q.theme==="Calculer l'atltitude des points 1 - 2 - 3"){
+      csv+=`${i+1}-Pt1;${q.lecture1};${q.lecture2};${q.lecture3};${q.lecture4};${q.alt1};${userAnswers[i].val1.toFixed(3)};${q.correct1.toFixed(3)};1\n`;
+      csv+=`${i+1}-Pt2;${q.lecture1};${q.lecture2};${q.lecture3};${q.lecture4};${q.alt1};${userAnswers[i].val2.toFixed(3)};${q.correct2.toFixed(3)};1\n`;
+      csv+=`${i+1}-Pt3;${q.lecture1};${q.lecture2};${q.lecture3};${q.lecture4};${q.alt1};${userAnswers[i].val3.toFixed(3)};${q.correct3.toFixed(3)};1\n`;
+    } else {
+      csv+=`${i+1};${q.lecture1};${q.lecture2};;;${q.alt1};${userAnswers[i].toFixed(3)};${q.correct.toFixed(3)};1\n`;
+    }
+  });
+  csv+=`;;;;;Note obtenue;${score}\n`;
+  csv+=`;;;;;Maximum possible;${totalPoints}\n`;
+
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`resultat_${candidateName}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function sendResultToSheet(){
+  let totalPoints=0;
+  selectedQuestions.forEach((q)=>{
+    if(q.theme==="Calculer l'altitude des points 1 et 2"){
+      totalPoints+=2;
+    } else if(q.theme==="Calculer l'atltitude des points 1 - 2 - 3"){
+      totalPoints+=3;
+    } else {
+      totalPoints+=1;
+    }
+  });
+  const data={
+    name:candidateName,
+    score:score,
+    maxPoints:totalPoints,
+    quizName:quizName
+  };
+
+  const loadingDiv=document.getElementById("sendingStatus");
+  if(loadingDiv){
+    loadingDiv.style.display="block";
+    loadingDiv.innerHTML='<p style="color:#ff6600; font-weight:bold;">⏳ Envoi des résultats en cours...</p>';
+  }
+
+  const downloadBtn=document.getElementById("downloadBtn");
+  if(downloadBtn) downloadBtn.style.display="none";
+
+  fetch("https://script.google.com/macros/s/AKfycbzLJm66D4_37uN8Sxq-8SbEySW65bW-AzOrnUpIJiGOYzV6zl2wk57cjcqAWZtoyIR3UQ/exec",{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(data)
+  }).then(res=>res.json()).then(res=>{
+    if(res.status==="success"){
+      if(loadingDiv){
+        loadingDiv.innerHTML='<p style="color:#388e3c; font-weight:bold;">✅ Résultats enregistrés avec succès !</p>';
+      }
+      if(downloadBtn) downloadBtn.style.display="inline-block";
+    } else {
+      if(loadingDiv){
+        loadingDiv.innerHTML='<p style="color:#d32f2f; font-weight:bold;">❌ Erreur lors de l\'envoi</p>';
+      }
+      if(downloadBtn) downloadBtn.style.display="inline-block";
+    }
+  }).catch(err=>{
+    console.error("Erreur d'envoi :",err);
+    if(loadingDiv){
+      loadingDiv.innerHTML='<p style="color:#d32f2f; font-weight:bold;">❌ Erreur de connexion</p>';
+    }
+    if(downloadBtn) downloadBtn.style.display="inline-block";
+  });
+}
+
+function showResults(){
+  let totalPoints=0;
+  score=0;
+  
+  selectedQuestions.forEach((q,i)=>{
+    if(q.theme==="Calculer l'altitude des points 1 et 2"){
+      totalPoints+=2;
+      if(userAnswers[i].val1===q.correct1) score++;
+      if(userAnswers[i].val2===q.correct2) score++;
+    } else if(q.theme==="Calculer l'atltitude des points 1 - 2 - 3"){
+      totalPoints+=3;
+      if(userAnswers[i].val1===q.correct1) score++;
+      if(userAnswers[i].val2===q.correct2) score++;
+      if(userAnswers[i].val3===q.correct3) score++;
+    } else {
+      totalPoints+=1;
+      if(userAnswers[i]===q.correct) score++;
+    }
+  });
+
+  const percentage=Math.round((score/totalPoints)*100);
+  let scoreColor="#d32f2f";
+  if(percentage>=80) scoreColor="#388e3c";
+  else if(percentage>=50) scoreColor="#f57c00";
+
+  let tableHTML=`<table>
+  <thead><tr>
+  <th>Question</th><th>Lecture1 (mm)</th><th>Lecture2 (mm)</th><th>Lecture3 (mm)</th><th>Lecture4 (mm)</th><th>Altitude1 (m)</th><th>Réponse élève</th><th>Réponse correcte</th><th>Points max</th>
+  </tr></thead><tbody>`;
+
+  selectedQuestions.forEach((q,i)=>{
+    if(q.theme==="Calculer l'altitude des points 1 et 2"){
+      const isError1 = userAnswers[i].val1.toFixed(3) !== q.correct1.toFixed(3);
+      const isError2 = userAnswers[i].val2.toFixed(3) !== q.correct2.toFixed(3);
+      const answerStyle1 = isError1 ? 'style="background-color:#ffcccc;"' : '';
+      const answerStyle2 = isError2 ? 'style="background-color:#ffcccc;"' : '';
+      tableHTML+=`<tr>
+      <td>${i+1}-Pt1</td><td>${q.lecture1}</td><td>${q.lecture2}</td><td>${q.lecture3}</td><td></td><td>${q.alt1}</td><td ${answerStyle1}>${userAnswers[i].val1.toFixed(3)}</td><td>${q.correct1.toFixed(3)}</td><td>1</td>
+      </tr>`;
+      tableHTML+=`<tr>
+      <td>${i+1}-Pt2</td><td>${q.lecture1}</td><td>${q.lecture2}</td><td>${q.lecture3}</td><td></td><td>${q.alt1}</td><td ${answerStyle2}>${userAnswers[i].val2.toFixed(3)}</td><td>${q.correct2.toFixed(3)}</td><td>1</td>
+      </tr>`;
+    } else if(q.theme==="Calculer l'atltitude des points 1 - 2 - 3"){
+      const isError1 = userAnswers[i].val1.toFixed(3) !== q.correct1.toFixed(3);
+      const isError2 = userAnswers[i].val2.toFixed(3) !== q.correct2.toFixed(3);
+      const isError3 = userAnswers[i].val3.toFixed(3) !== q.correct3.toFixed(3);
+      const answerStyle1 = isError1 ? 'style="background-color:#ffcccc;"' : '';
+      const answerStyle2 = isError2 ? 'style="background-color:#ffcccc;"' : '';
+      const answerStyle3 = isError3 ? 'style="background-color:#ffcccc;"' : '';
+      tableHTML+=`<tr>
+      <td>${i+1}-Pt1</td><td>${q.lecture1}</td><td>${q.lecture2}</td><td>${q.lecture3}</td><td>${q.lecture4}</td><td>${q.alt1}</td><td ${answerStyle1}>${userAnswers[i].val1.toFixed(3)}</td><td>${q.correct1.toFixed(3)}</td><td>1</td>
+      </tr>`;
+      tableHTML+=`<tr>
+      <td>${i+1}-Pt2</td><td>${q.lecture1}</td><td>${q.lecture2}</td><td>${q.lecture3}</td><td>${q.lecture4}</td><td>${q.alt1}</td><td ${answerStyle2}>${userAnswers[i].val2.toFixed(3)}</td><td>${q.correct2.toFixed(3)}</td><td>1</td>
+      </tr>`;
+      tableHTML+=`<tr>
+      <td>${i+1}-Pt3</td><td>${q.lecture1}</td><td>${q.lecture2}</td><td>${q.lecture3}</td><td>${q.lecture4}</td><td>${q.alt1}</td><td ${answerStyle3}>${userAnswers[i].val3.toFixed(3)}</td><td>${q.correct3.toFixed(3)}</td><td>1</td>
+      </tr>`;
+    } else {
+      const isError = userAnswers[i].toFixed(3) !== q.correct.toFixed(3);
+      const answerStyle = isError ? 'style="background-color:#ffcccc;"' : '';
+      tableHTML+=`<tr>
+      <td>${i+1}</td><td>${q.lecture1}</td><td>${q.lecture2}</td><td></td><td></td><td>${q.alt1}</td><td ${answerStyle}>${userAnswers[i].toFixed(3)}</td><td>${q.correct.toFixed(3)}</td><td>1</td>
+      </tr>`;
+    }
+  });
+  tableHTML+=`</tbody></table>`;
+
+  DOM.quiz.innerHTML=`<div class="question">
+  <p>${i18n.candidate} <strong>${candidateName}</strong></p>
+  <p>${i18n.result} <strong style="color:${scoreColor}">${score} / ${totalPoints} points (${percentage}%)</strong></p>
+  ${tableHTML}
+  <div id="sendingStatus" style="display:none; margin-top:15px;"></div>
+  <button id="downloadBtn">📥 Télécharger le résultat</button>
+  </div>`;
+
+  document.getElementById("downloadBtn").onclick=downloadCSV;
+  sendResultToSheet();
+  DOM.restartBtn.style.display="inline-block";
+}
+
+function showIntro(){
+  DOM.intro.style.display="flex";
+  DOM.quiz.style.display="none";
+  DOM.restartBtn.style.display="none";
+  DOM.quizSubtitle.textContent="";
+  DOM.pageTitle.textContent="Le nivellement par rayonnement";
+  DOM.testTypeSelection.style.display="block";
+  DOM.nameSelection.style.display="none";
+  DOM.candidateName.value="";
+  DOM.startBtn.disabled=true;
+  testType = "";
+  questionCount = 10;
+  themeFilter = null;
+}
+
+function selectTestType(type, count, theme = null){
+  testType = type;
+  questionCount = count;
+  themeFilter = theme;
+  DOM.pageTitle.textContent = type.toUpperCase();
+  DOM.testTypeSelection.style.display="none";
+  DOM.nameSelection.style.display="block";
+  DOM.candidateName.focus();
+  DOM.candidateName.oninput=()=>{ DOM.startBtn.disabled=DOM.candidateName.value.trim().length<2; };
+}
+
+function startQuiz(){
+  candidateName=DOM.candidateName.value.trim().toUpperCase();
+  if(!candidateName) return;
+  const isAuthorized=Object.values(AUTHORIZED_CANDIDATES).some(group=>group.includes(candidateName));
+  if(!isAuthorized){ alert("❌ Accès refusé. Votre nom n'est pas autorisé pour faire ce test."); DOM.candidateName.value=""; DOM.startBtn.disabled=true; return; }
+  DOM.intro.style.display="none";
+  DOM.quiz.style.display="block";
+  quizName="MODULE 5 - " + testType;
+  selectedQuestions=getRandomQuestionsIntercalated(themeFilter);
+  currentIndex=0;
+  userAnswers=new Array(selectedQuestions.length).fill(0);
+  DOM.quizSubtitle.textContent=i18n.questions.replace("{count}",selectedQuestions.length);
+  renderQuestion();
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  showIntro();
+  DOM.startBtn.onclick=startQuiz;
+  DOM.restartBtn.onclick=showIntro;
+  DOM.exercice1Btn.onclick=()=>selectTestType("Exercice 1", 10, "Calculer l'altitude des points 1 et 2");
+  DOM.exercice2Btn.onclick=()=>selectTestType("Exercice 2", 10, "Calculer l'atltitude des points 1 - 2 - 3");
+  DOM.evaluationBtn.onclick=()=>selectTestType("Évaluation", 20, null);
+});
+</script>
+</body>
+</html>
